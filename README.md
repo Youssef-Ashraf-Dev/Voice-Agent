@@ -1,56 +1,40 @@
-# 🤖 E-Commerce Voice Agent with RAG
+# E-Commerce Voice Agent with RAG
 
-A real-time voice AI assistant powered by **Google Gemini Live API**, **LiveKit**, and **FAISS-based RAG** for answering e-commerce customer support questions.
+A production-ready real-time voice AI assistant powered by Google Gemini Live API, LiveKit, and FAISS-based RAG for intelligent e-commerce customer support.
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Overview](#overview)
-- [Features](#features)
 - [Architecture](#architecture)
 - [Prerequisites](#prerequisites)
 - [Setup Instructions](#setup-instructions)
-- [Running the Application](#running-the-application)
+- [Running Locally](#running-locally)
 - [Project Structure](#project-structure)
-- [How It Works](#how-it-works)
-- [Documentation](#documentation)
-- [Troubleshooting](#troubleshooting)
+- [Technical Documentation](#technical-documentation)
 
 ---
 
-## 🎯 Overview
+## Overview
 
-This project implements a voice-activated AI assistant that can answer customer questions about orders, shipping, returns, payments, and other e-commerce topics. The agent uses:
+This system implements an intelligent voice assistant that provides real-time responses to customer inquiries about e-commerce operations including orders, shipping, returns, payments, and policies. The architecture combines:
 
-- **Google Gemini Live API** for real-time voice interaction
-- **LiveKit** for WebRTC-based audio streaming
-- **FAISS** for vector similarity search in the FAQ knowledge base
-- **React + Vite** for the web interface
+- **Google Gemini Live API** (`gemini-live-2.5-flash-preview`) for native voice processing
+- **LiveKit** for WebRTC-based real-time audio streaming infrastructure
+- **FAISS** vector database for semantic similarity search over FAQ knowledge base
+- **React + Vite** frontend with LiveKit Client SDK
 
-**Demo Flow:**
-1. User opens the web UI and clicks "Start Voice Chat"
-2. User speaks a question (e.g., "What's your return policy?")
-3. Voice is streamed to the AI agent via LiveKit
-4. Agent uses RAG to search the FAQ database
-5. AI responds with accurate information using natural voice
-
----
-
-## ✨ Features
-
-- 🎙️ **Real-time voice interaction** with natural conversation flow
-- 🔍 **RAG-powered answers** from a curated FAQ knowledge base (79 entries)
-- 🧠 **Persistent embeddings cache** for fast startup (<1 second)
-- 🌐 **Modern web UI** with React and LiveKit SDK
-- 🔒 **Secure token-based authentication** with JWT
-- 📊 **Agent state visualization** (speaking, listening, thinking, idle)
-- ⚡ **High-quality audio** (96 kbps, echo cancellation, noise suppression)
-- 🚀 **Production-ready architecture** with scalable components
+**Key Capabilities:**
+- Real-time bidirectional voice communication with <2s latency
+- RAG-enhanced responses using vector similarity search (384-dimensional embeddings)
+- Persistent embeddings cache for sub-second initialization
+- JWT-based secure authentication
+- High-fidelity audio (96 kbps Opus codec, echo cancellation, noise suppression)
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
-### System Components
+### System Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -114,112 +98,212 @@ This project implements a voice-activated AI assistant that can answer customer 
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### How LiveKit Connects to Gemini Live API
+### LiveKit Connection to Gemini Live API
 
-1. **User speaks** → Browser captures audio via microphone
-2. **LiveKit Client SDK** encodes audio to Opus codec and streams via WebSocket
-3. **LiveKit Cloud** routes the audio stream to the Voice Agent
-4. **Voice Agent** receives audio and passes it to `google.beta.realtime.RealtimeModel`
-5. **Gemini Live API** processes the audio natively (no manual transcription needed)
-6. **Gemini decides** if it needs more information and calls `lookup_company_info()` function
-7. **RAG system** searches FAISS and returns relevant FAQ entries
-8. **Gemini** generates a natural response incorporating the RAG data
-9. **Audio response** flows back through LiveKit to the user's browser
+**Audio Flow Pipeline:**
 
-### RAG Integration with Gemini Live API
+1. **User Input Capture**
+   - Browser microphone API captures raw audio
+   - LiveKit Client SDK encodes to Opus codec (efficient compression for voice)
+   - Audio transmitted via WebSocket to LiveKit Cloud SFU (Selective Forwarding Unit)
 
-The RAG system integrates through **function calling**:
+2. **Agent Processing**
+   - LiveKit Cloud routes audio stream to Voice Agent (Python worker)
+   - Agent forwards stream to `google.beta.realtime.RealtimeModel`
+   - Gemini Live API processes audio natively (integrated speech-to-text, no separate transcription)
+
+3. **Natural Language Understanding**
+   - Gemini performs intent recognition on transcribed speech
+   - Evaluates if query requires knowledge base lookup
+   - Triggers function call: `lookup_company_info(query)` when needed
+
+4. **Response Generation**
+   - Audio response synthesized by Gemini (integrated text-to-speech)
+   - Agent receives audio stream from Gemini
+   - LiveKit routes audio back to browser for playback
+
+**Connection Characteristics:**
+- Protocol: WebSocket (WSS) for persistent bidirectional communication
+- Latency: ~200-500ms browser↔LiveKit, ~500-1000ms Gemini processing
+- Audio: 24 kHz sample rate, 96 kbps bitrate, mono channel
+
+### RAG Integration Architecture
+
+**Function Calling Mechanism:**
+
+The RAG system integrates via Gemini's native function calling capability:
 
 ```python
 @function_tool
 async def lookup_company_info(query: str):
     """
-    Searches the company's FAQ database for information.
-    Gemini AI calls this function automatically when it needs information.
+    Searches the company's FAQ database for information about orders, 
+    shipping, returns, payments, and policies.
+    
+    Args:
+        query: User's question or keywords
+    
+    Returns:
+        Formatted Q&A pairs from knowledge base
     """
-    return rag.search(query)
+    return rag.search(query, top_k=3)
 ```
 
-**Key Points:**
-- Gemini Live API supports native function calling
-- The agent registers `lookup_company_info` as an available tool
-- Gemini's system prompt instructs it to ALWAYS use this tool for e-commerce questions
-- When called, the function performs vector similarity search in FAISS
-- Results are injected into Gemini's context for response generation
-- Gemini synthesizes the information into natural spoken responses
+**Integration Flow:**
+
+1. **Function Registration**
+   - Agent registers `lookup_company_info` as available tool during initialization
+   - Function signature and docstring sent to Gemini for decision-making context
+
+2. **Query Processing**
+   - User query: *"What's your return policy?"*
+   - Gemini analyzes intent and determines function call needed
+   - Invokes: `lookup_company_info("return policy")`
+
+3. **Vector Search Execution**
+   ```python
+   # In rag.py
+   query_embedding = model.encode(query)  # 384-dim vector via all-MiniLM-L6-v2
+   distances, indices = faiss_index.search(query_embedding, k=3)
+   results = [documents[i] for i in indices[0]]
+   ```
+
+4. **Context Injection**
+   - RAG returns top-3 semantically similar Q&A pairs
+   - Results injected into Gemini's context window
+   - Gemini synthesizes natural language response incorporating retrieved information
+
+5. **Response Delivery**
+   - Gemini generates contextually-aware answer
+   - Converted to speech and streamed back to user
+
+**RAG System Configuration:**
+- **Embedding Model**: `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions)
+- **Vector Index**: FAISS IndexFlatL2 (L2 distance metric)
+- **Knowledge Base**: 79 FAQ entries from `data/ecommerce.json`
+- **Retrieval**: Top-3 results with cosine similarity ranking
+- **Cache**: Persistent storage in `embeddings_cache/` for instant loading
 
 ---
 
-## 📋 Prerequisites
+## Prerequisites
 
-### Required Software
+### Software Requirements
 
-- **Python 3.13** (or 3.10+)
-- **Node.js 18+** and npm
-- **Git**
-- **Windows PowerShell** (or bash on Linux/Mac)
+| Component | Version | Purpose |
+|-----------|---------|---------|
+| Python | 3.10 - 3.13 | Backend agent and RAG system |
+| Node.js | 18+ | Frontend development server |
+| npm | 9+ | JavaScript package management |
+| Git | Latest | Version control |
 
-### Required API Keys & Accounts
+### API Keys and Service Accounts
 
-1. **Google AI Studio API Key**
-   - Sign up at: https://aistudio.google.com/
-   - Create API key for Gemini
-   - Set environment variable: `GOOGLE_API_KEY`
+#### 1. Google AI Studio API Key
 
-2. **LiveKit Account**
-   - Sign up at: https://livekit.io/
-   - Create a project
-   - Get API Key, API Secret, and WebSocket URL
-   - Set environment variables:
-     - `LIVEKIT_API_KEY`
-     - `LIVEKIT_API_SECRET`
-     - `LIVEKIT_URL` (e.g., `wss://your-project.livekit.cloud`)
+**Purpose**: Authenticates requests to Gemini Live API for voice processing
+
+**Setup Steps:**
+1. Navigate to [Google AI Studio](https://aistudio.google.com/)
+2. Sign in with Google account
+3. Click "Get API Key" → "Create API Key"
+4. Copy the generated key (format: `AIzaSy...`)
+5. Store securely for environment configuration
+
+**Permissions Required**: Gemini API access
+
+#### 2. LiveKit Cloud Account
+
+**Purpose**: Provides WebRTC infrastructure for real-time audio streaming
+
+**Setup Steps:**
+1. Create account at [LiveKit Cloud](https://livekit.io/)
+2. Create new project (e.g., "voice-agent-production")
+3. Navigate to project settings → API Keys
+4. Generate new API key pair:
+   - **API Key**: Identifier (format: `APIxxx...`)
+   - **API Secret**: Secret key (format: `xxx...`) - treat as password
+5. Copy WebSocket URL from project dashboard:
+   - Format: `wss://your-project-name.livekit.cloud`
+
+**Configuration Details:**
+- **API Key**: Used for server-side token generation
+- **API Secret**: Used for signing JWT tokens (never expose client-side)
+- **WebSocket URL**: Connection endpoint for LiveKit rooms
 
 ---
 
-## 🚀 Setup Instructions
+## Setup Instructions
 
-### 1. Clone the Repository
+### 1. Repository Setup
 
 ```bash
 git clone https://github.com/yourusername/voice-agent.git
 cd voice-agent
 ```
 
-### 2. Set Up Python Environment
+### 2. Python Environment Configuration
+
+**Create and activate virtual environment:**
 
 ```bash
-# Create virtual environment
+# Create isolated Python environment
 python -m venv .venv
 
-# Activate virtual environment
+# Activate environment
 # Windows PowerShell:
 .\.venv\Scripts\Activate.ps1
 
-# Linux/Mac:
+# Linux/macOS:
 source .venv/bin/activate
+```
 
-# Install Python dependencies
+**Install dependencies:**
+
+```bash
 pip install -r requirements.txt
 ```
 
-### 3. Set Up Environment Variables
+**Dependencies installed:**
+- `fastapi` + `uvicorn`: Token server (JWT generation)
+- `livekit` + `livekit-agents` + `livekit-plugins-google`: Voice agent framework
+- `google-generativeai`: Gemini API client
+- `faiss-cpu` + `sentence-transformers`: RAG system (vector search + embeddings)
+- `PyJWT`: Token signing
+- `python-dotenv`: Environment variable loading
 
-Create a `.env` file in the project root:
+### 3. Environment Variables Configuration
 
-```env
-# Google Gemini API
-GOOGLE_API_KEY=your_google_api_key_here
+Create `.env` file in project root directory:
 
-# LiveKit Configuration
-LIVEKIT_API_KEY=your_livekit_api_key
-LIVEKIT_API_SECRET=your_livekit_api_secret
-LIVEKIT_URL=wss://your-project.livekit.cloud
+```bash
+# .env file (do NOT commit to version control)
+
+# Google Gemini API Configuration
+GOOGLE_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+# LiveKit Cloud Configuration
+LIVEKIT_API_KEY=APIxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+LIVEKIT_API_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+LIVEKIT_URL=wss://your-project-name.livekit.cloud
 ```
 
-**Security Note:** Never commit the `.env` file to Git. It's already in `.gitignore`.
+**Environment Variable Details:**
 
-### 4. Set Up Frontend
+| Variable | Description | Example Format | Required |
+|----------|-------------|----------------|----------|
+| `GOOGLE_API_KEY` | Google AI Studio API key for Gemini | `AIzaSy...` | Yes |
+| `LIVEKIT_API_KEY` | LiveKit project API identifier | `APIxxx...` | Yes |
+| `LIVEKIT_API_SECRET` | LiveKit secret for JWT signing | Base64 string | Yes |
+| `LIVEKIT_URL` | WebSocket URL for LiveKit connection | `wss://xxx.livekit.cloud` | Yes |
+
+**Security Best Practices:**
+- Never commit `.env` file (already in `.gitignore`)
+- Rotate keys if accidentally exposed
+- Use separate keys for development/production
+- Restrict API key permissions to minimum required scope
+
+### 4. Frontend Setup
 
 ```bash
 cd my-voice-app
@@ -227,418 +311,269 @@ npm install
 cd ..
 ```
 
-### 5. Initialize RAG System (Optional)
+**Installs:**
+- `react` + `react-dom`: UI framework
+- `livekit-client` + `@livekit/components-react`: LiveKit SDK
+- `vite`: Development server and build tool
 
-The RAG system will automatically create embeddings on first run. To verify:
+### 5. Verify RAG System Initialization
+
+The RAG system automatically generates embeddings on first execution. To verify setup:
 
 ```bash
 python -c "import rag; print(rag.get_stats())"
 ```
 
-Expected output:
+**Expected output:**
 ```
 RAG System Statistics:
 - Total documents: 79
 - Vector dimensions: 384
 - Model: all-MiniLM-L6-v2
-- Cache status: Created
+- Cache status: Loaded from disk (or Created on first run)
+- Cache location: embeddings_cache/
+- Index size: ~122 KB
 ```
+
+**First Run Behavior:**
+- Downloads `all-MiniLM-L6-v2` model (~90 MB)
+- Generates 79 embeddings from `data/ecommerce.json`
+- Creates FAISS index and saves to `embeddings_cache/`
+- Subsequent runs load from cache (<1 second)
 
 ---
 
-## 🎮 Running the Application
+## Running Locally
 
-You need **3 terminal windows** running simultaneously:
+The system requires **3 concurrent processes** running in separate terminals:
 
 ### Terminal 1: Token Server
 
+**Purpose**: Generates JWT tokens for LiveKit room authentication
+
 ```bash
-cd "D:\Professional\Projects\Voice Agent\Voice-Agent"
+# Navigate to project root
+cd voice-agent
+
+# Start FastAPI server
 python token_server.py
 ```
 
-**Expected output:**
+**Expected Output:**
 ```
-INFO:     Started server process
-INFO:     Uvicorn running on http://0.0.0.0:8000
+INFO:     Started server process [PID: xxxxx]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 ```
+
+**Verification:**
+- Server listens on `http://localhost:8000`
+- Endpoint: `GET /getToken` returns `{token: string, url: string}`
+- CORS enabled for `http://localhost:5173` (development only)
+
+**Troubleshooting:**
+- Port 8000 already in use: `netstat -ano | findstr :8000` (Windows) or `lsof -i :8000` (Linux/Mac)
+- Import errors: Verify virtual environment activated and dependencies installed
+
+---
 
 ### Terminal 2: Voice Agent
 
+**Purpose**: Manages LiveKit-Gemini connection and RAG function calls
+
 ```bash
-cd "D:\Professional\Projects\Voice Agent\Voice-Agent"
-.\.venv\Scripts\Activate.ps1
+# Navigate to project root
+cd voice-agent
+
+# Activate virtual environment
+.\.venv\Scripts\Activate.ps1  # Windows
+# source .venv/bin/activate    # Linux/macOS
+
+# Start agent in development mode
 python agent.py dev
 ```
 
-**Expected output:**
+**Expected Output:**
 ```
-INFO   livekit.agents   starting worker
-INFO   livekit.agents   registered worker
+DEBUG  asyncio          Using proactor: IocpProactor
+INFO   livekit.agents   starting worker {"version": "1.3.2"}
+INFO   livekit.agents   registered worker {"id": "AW_xxxxx", "region": "..."}
 ```
 
-### Terminal 3: Web UI
+**Initialization Steps:**
+1. Loads environment variables from `.env`
+2. Initializes RAG system (loads FAISS index and embeddings)
+3. Connects to LiveKit Cloud using WebSocket
+4. Registers as available agent worker
+5. Waits for room join events
+
+**Verification:**
+- Log shows "registered worker" with unique ID
+- RAG system loads in <1 second (from cache)
+- No authentication errors with Google/LiveKit APIs
+
+**Troubleshooting:**
+- `ModuleNotFoundError`: Check virtual environment activation
+- Authentication errors: Verify `.env` file exists and contains valid keys
+- Connection timeout: Check network/firewall allows WSS connections to LiveKit
+
+---
+
+### Terminal 3: Frontend Development Server
+
+**Purpose**: Serves React UI for browser access
 
 ```bash
-cd "D:\Professional\Projects\Voice Agent\Voice-Agent\my-voice-app"
+# Navigate to frontend directory
+cd voice-agent/my-voice-app
+
+# Start Vite development server
 npm run dev
 ```
 
-**Expected output:**
+**Expected Output:**
 ```
-VITE v7.2.4  ready in 300 ms
+VITE v7.2.4  ready in 269 ms
+
 ➜  Local:   http://localhost:5173/
+➜  Network: use --host to expose
+➜  press h + enter to show help
 ```
 
-### 6. Open the Application
+**Verification:**
+- Server accessible at `http://localhost:5173`
+- Hot module replacement (HMR) enabled for live code updates
 
-1. Open browser and navigate to: **http://localhost:5173**
-2. Click **"Start Voice Chat"**
-3. Allow microphone access when prompted
-4. Start speaking!
-
-**Example questions to try:**
-- "What's your return policy?"
-- "How long does shipping take?"
-- "What payment methods do you accept?"
-- "Can I track my order?"
-- "Do you offer gift wrapping?"
+**Troubleshooting:**
+- Port 5173 in use: Vite auto-increments (check output for actual port)
+- Build errors: Delete `node_modules/` and run `npm install` again
 
 ---
 
-## 📁 Project Structure
+### Testing the Complete System
+
+1. **Open Browser**
+   - Navigate to `http://localhost:5173`
+   - Use Chrome/Edge for best WebRTC compatibility
+
+2. **Initiate Voice Session**
+   - Click "Start Voice Chat" button
+   - Browser requests token from `localhost:8000/getToken`
+   - UI connects to LiveKit using returned JWT token
+   - Allow microphone access when prompted
+
+3. **Verify Connection**
+   - UI shows "Connected" state
+   - Voice Agent terminal shows "room joined" log
+   - Agent greets user with introduction
+
+4. **Test Voice Interaction**
+   ```
+   User: "What's your return policy?"
+   → Agent processes via Gemini
+   → Calls lookup_company_info("return policy")
+   → RAG searches FAISS index
+   → Returns relevant Q&A
+   → Agent speaks natural response
+   ```
+
+5. **Monitor Logs**
+   - Token Server: Shows token generation requests
+   - Voice Agent: Shows RAG tool calls and responses
+   - Browser Console (F12): Shows LiveKit connection events
+
+**Sample Test Queries:**
+- "What payment methods do you accept?"
+- "How long does standard shipping take?"
+- "Can I return items after 30 days?"
+- "Do you offer international shipping?"
+- "How do I track my order?"
+
+**Performance Expectations:**
+- Connection establishment: <2 seconds
+- Speech recognition latency: 200-500ms
+- RAG search time: <10ms
+- End-to-end response: 1-2 seconds
+
+---
+
+## Project Structure
 
 ```
-Voice-Agent/
-├── agent.py                          # Main voice agent entrypoint
-├── token_server.py                   # JWT token generation server
-├── rag.py                            # RAG system with FAISS
-├── requirements.txt                  # Python dependencies
-├── .env                              # Environment variables (not committed)
-├── .gitignore                        # Git ignore rules
+voice-agent/
+│
+├── agent.py                          # Voice agent entrypoint (LiveKit worker)
+├── token_server.py                   # FastAPI server for JWT token generation
+├── rag.py                            # RAG system: FAISS indexing + search
+├── requirements.txt                  # Python dependencies (major packages only)
+├── .env                              # Environment variables (not version controlled)
+├── .env.example                      # Template for environment configuration
+├── .gitignore                        # Git exclusions
 │
 ├── data/
-│   └── ecommerce.json                # Knowledge base (79 FAQs)
+│   └── ecommerce.json                # Knowledge base: 79 FAQ Q&A pairs
 │
-├── embeddings_cache/
-│   ├── faiss_index.bin               # FAISS vector index (~122 KB)
+├── embeddings_cache/                 # Persistent vector storage (auto-generated)
+│   ├── faiss_index.bin               # FAISS L2 index (~122 KB)
 │   └── metadata.pkl                  # Document metadata (~45 KB)
 │
-├── my-voice-app/                     # React frontend
+├── my-voice-app/                     # React frontend application
 │   ├── package.json                  # Node.js dependencies
-│   ├── vite.config.js                # Vite configuration
+│   ├── vite.config.js                # Vite build configuration
 │   ├── index.html                    # HTML entry point
 │   └── src/
-│       ├── main.jsx                  # React entry point
-│       ├── App.jsx                   # Main React component
-│       └── App.css                   # Styling
+│       ├── main.jsx                  # React initialization
+│       ├── App.jsx                   # Main UI component (LiveKitRoom + state)
+│       └── App.css                   # Component styling
 │
-└── Documentation/
-    ├── README.md                     # This file
-    ├── SYSTEM_ARCHITECTURE_EXPLAINED.md   # Complete system guide
-    ├── REACT_UI_DETAILED_GUIDE.md         # React/Frontend guide
-    ├── RAG_FLOW_EXPLAINED.md              # RAG system explanation
-    ├── RAG_RETRIEVAL_DOCUMENTATION.md     # RAG retrieval examples
-    ├── EMBEDDING_TESTING_GUIDE.md         # Embedding accuracy tests
-    └── UI_SETUP_GUIDE.md                  # UI setup instructions
+└── [Documentation Files]
+    ├── SYSTEM_ARCHITECTURE_EXPLAINED.md   # Complete architecture deep-dive
+    ├── REACT_UI_DETAILED_GUIDE.md         # Frontend guide for backend developers
+    ├── RAG_FLOW_EXPLAINED.md              # RAG integration with Gemini
+    ├── RAG_RETRIEVAL_DOCUMENTATION.md     # Retrieval examples and benchmarks
+    ├── EMBEDDING_TESTING_GUIDE.md         # Embedding accuracy validation
+    └── UI_SETUP_GUIDE.md                  # Step-by-step UI instructions
 ```
 
----
+**Core Components:**
 
-## 🔧 How It Works
-
-### Voice Interaction Flow
-
-```
-1. User speaks: "What's your return policy?"
-   ↓
-2. Browser captures audio → LiveKit Client SDK
-   ↓
-3. WebSocket stream → LiveKit Cloud
-   ↓
-4. LiveKit routes → Voice Agent
-   ↓
-5. Agent forwards → Gemini Live API
-   ↓
-6. Gemini understands query and calls: lookup_company_info("return policy")
-   ↓
-7. RAG System:
-   - Embeds query: "return policy" → 384-dim vector
-   - Searches FAISS: Find top-3 similar vectors
-   - Returns: Q&A about 30-day returns, original payment method, etc.
-   ↓
-8. Gemini receives RAG results
-   ↓
-9. Gemini generates natural response: "Our return policy allows..."
-   ↓
-10. Gemini converts to speech (audio)
-   ↓
-11. Agent → LiveKit → Browser
-   ↓
-12. User hears the response
-```
-
-### RAG Retrieval Process
-
-**Step-by-step:**
-
-1. **Query arrives**: `"return policy"`
-2. **Embed query**: 
-   ```python
-   query_embedding = model.encode("return policy")
-   # Result: [0.123, -0.456, 0.789, ...] (384 dimensions)
-   ```
-3. **Search FAISS**:
-   ```python
-   distances, indices = faiss_index.search(query_embedding, k=3)
-   ```
-4. **Retrieve documents**: Get top-3 most similar FAQ entries
-5. **Format results**:
-   ```
-   Q: What is your return policy?
-   A: You can return items within 30 days of delivery...
-   
-   Q: How do I initiate a return?
-   A: Log into your account, go to Orders, click Return...
-   ```
-6. **Return to Gemini**: Gemini uses this as context for its response
-
-### Agent Instructions
-
-The agent is configured with clear boundaries:
-
-```python
-agent = Agent(
-    instructions=(
-        "You are a helpful FAQ assistant. "
-        "You ONLY have access to general FAQ information. "
-        "You CANNOT access specific customer orders or accounts. "
-        "Always use the lookup_company_info tool for e-commerce questions. "
-        "Never ask for order numbers or personal information."
-    ),
-)
-```
-
-This ensures the agent:
-- ✅ Answers general policy questions
-- ✅ Uses RAG for accurate information
-- ❌ Doesn't pretend to access customer data
-- ❌ Doesn't ask for information it can't use
+| File | Purpose | Key Technologies |
+|------|---------|------------------|
+| `agent.py` | Voice agent worker that connects LiveKit to Gemini | `livekit-agents`, `google.beta.realtime` |
+| `token_server.py` | Generates JWT tokens for client authentication | `fastapi`, `PyJWT`, `livekit` |
+| `rag.py` | Vector search system for FAQ retrieval | `faiss-cpu`, `sentence-transformers` |
+| `my-voice-app/` | Browser-based UI for voice interaction | `react`, `livekit-client` |
 
 ---
 
-## 📚 Documentation
+## Technical Documentation
 
-### Detailed Guides
+### Comprehensive Guides
 
-1. **[SYSTEM_ARCHITECTURE_EXPLAINED.md](SYSTEM_ARCHITECTURE_EXPLAINED.md)**
-   - Complete system overview
-   - Component breakdown
-   - WebSocket and audio flow
-   - For technical interviews
-
-2. **[REACT_UI_DETAILED_GUIDE.md](REACT_UI_DETAILED_GUIDE.md)**
-   - React fundamentals for backend developers
-   - Component explanation with Python equivalents
-   - State management deep dive
-
-3. **[RAG_FLOW_EXPLAINED.md](RAG_FLOW_EXPLAINED.md)**
-   - How RAG integrates with Gemini
-   - Vector embeddings explained
-   - FAISS indexing process
-
-4. **[RAG_RETRIEVAL_DOCUMENTATION.md](RAG_RETRIEVAL_DOCUMENTATION.md)**
-   - Real retrieval examples
-   - Similarity scores and evidence
-   - Query optimization tips
-
-5. **[EMBEDDING_TESTING_GUIDE.md](EMBEDDING_TESTING_GUIDE.md)**
-   - How to validate embedding accuracy
-   - Test script usage
-   - Performance benchmarks
-
-6. **[UI_SETUP_GUIDE.md](UI_SETUP_GUIDE.md)**
-   - Step-by-step UI setup
-   - 3-terminal workflow
-   - Browser compatibility
+| Document | Description | Target Audience |
+|----------|-------------|-----------------|
+| [SYSTEM_ARCHITECTURE_EXPLAINED.md](SYSTEM_ARCHITECTURE_EXPLAINED.md) | Complete system architecture, component breakdown, WebSocket/audio flow | Technical reviewers, architects |
+| [RAG_FLOW_EXPLAINED.md](RAG_FLOW_EXPLAINED.md) | RAG integration with Gemini Live API, vector embeddings, FAISS indexing | ML engineers, backend developers |
+| [RAG_RETRIEVAL_DOCUMENTATION.md](RAG_RETRIEVAL_DOCUMENTATION.md) | Real retrieval examples, similarity metrics, query optimization | Data scientists, QA engineers |
+| [REACT_UI_DETAILED_GUIDE.md](REACT_UI_DETAILED_GUIDE.md) | React fundamentals with Python equivalents, component architecture | Backend developers learning frontend |
+| [EMBEDDING_TESTING_GUIDE.md](EMBEDDING_TESTING_GUIDE.md) | Embedding accuracy validation, test procedures, benchmarks | ML engineers, testers |
+| [UI_SETUP_GUIDE.md](UI_SETUP_GUIDE.md) | Step-by-step UI setup, 3-terminal workflow, browser compatibility | Developers, deployers |
 
 ---
 
-## 🐛 Troubleshooting
+## License
 
-### Common Issues
-
-#### "Failed to connect" in web UI
-
-**Problem**: Token server not running
-
-**Solution**:
-```bash
-python token_server.py
-```
-
-#### "Agent not responding"
-
-**Problem**: Voice agent not running or not connected to LiveKit
-
-**Solution**:
-```bash
-.\.venv\Scripts\Activate.ps1
-python agent.py dev
-```
-
-Check output for:
-```
-INFO   livekit.agents   registered worker
-```
-
-#### "Module not found" errors
-
-**Problem**: Virtual environment not activated or dependencies not installed
-
-**Solution**:
-```bash
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
-
-#### Audio is choppy or unclear
-
-**Problem**: Network latency or browser compatibility
-
-**Solution**:
-- Use **Google Chrome** (best WebRTC support)
-- Check your internet connection
-- Ensure firewall allows WebSocket connections
-- Audio settings are optimized in `App.jsx` (96 kbps, echo cancellation)
-
-#### RAG returns "No relevant information found"
-
-**Problem**: Query doesn't match FAQ topics
-
-**Solution**:
-- Check `data/ecommerce.json` for available topics
-- Try rephrasing the question
-- Add more FAQs to the knowledge base
-
-#### Environment variables not loading
-
-**Problem**: `.env` file not found or formatted incorrectly
-
-**Solution**:
-```bash
-# Verify .env file exists
-ls .env
-
-# Check format (no spaces around =)
-GOOGLE_API_KEY=your_key_here
-LIVEKIT_API_KEY=your_key_here
-```
+MIT License - See LICENSE file for details
 
 ---
 
-## 🔒 Security Best Practices
+## Support
 
-1. **Never commit `.env` file** - Already in `.gitignore`
-2. **Rotate API keys regularly** - Especially if exposed
-3. **Use token expiration** - Token server sets 10-minute expiry
-4. **Limit CORS** - Token server only allows localhost in development
-5. **Validate inputs** - Agent instructions prevent prompt injection
+- **Issues**: Open GitHub issue for bug reports or feature requests
+- **Documentation**: Refer to guides in repository root
+- **Security**: Report vulnerabilities privately to maintainers
 
 ---
 
-## 📈 Performance
-
-### RAG System
-
-- **First run**: 3-5 seconds (creates embeddings)
-- **Subsequent runs**: <1 second (loads from cache)
-- **Search latency**: <10 milliseconds per query
-- **Cache size**: ~170 KB (79 documents)
-
-### Voice Latency
-
-- **User speaks → Agent hears**: ~200-500ms
-- **RAG search**: <10ms
-- **Gemini processing**: ~500-1000ms
-- **Agent speaks → User hears**: ~200-500ms
-- **Total round-trip**: ~1-2 seconds
-
-### Audio Quality
-
-- **Codec**: Opus (WebRTC standard)
-- **Bitrate**: 96 kbps (high quality)
-- **Sample rate**: 24 kHz (Gemini native)
-- **Echo cancellation**: Enabled
-- **Noise suppression**: Enabled
-
----
-
-## 🚀 Production Deployment
-
-### Considerations
-
-1. **Scale LiveKit**: Use LiveKit Cloud or self-hosted cluster
-2. **Database**: Move from JSON to PostgreSQL/MongoDB for larger FAQ sets
-3. **Vector DB**: Consider Pinecone, Weaviate, or Qdrant for production RAG
-4. **CDN**: Serve React build through CloudFlare or AWS CloudFront
-5. **Monitoring**: Add logging, metrics (Prometheus), and error tracking (Sentry)
-6. **Load balancing**: Use multiple agent instances for high concurrency
-
-### Environment Variables for Production
-
-```env
-# Use production LiveKit URL
-LIVEKIT_URL=wss://production.livekit.cloud
-
-# Enable HTTPS for token server
-TOKEN_SERVER_URL=https://api.yourdomain.com
-
-# Set CORS to your production domain
-ALLOWED_ORIGINS=https://yourdomain.com
-```
-
----
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature-name`
-3. Commit changes: `git commit -am 'Add feature'`
-4. Push to branch: `git push origin feature-name`
-5. Submit a Pull Request
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License.
-
----
-
-## 👥 Authors
-
-- **Your Name** - Initial work
-
----
-
-## 🙏 Acknowledgments
-
-- **LiveKit** - Real-time audio infrastructure
-- **Google Gemini** - AI language model with native voice support
-- **Sentence Transformers** - Embedding models for RAG
-- **FAISS** - Efficient vector similarity search
-- **React Team** - Frontend framework
-
----
-
-## 📞 Support
-
-For questions or issues:
-- Open an issue on GitHub
-- Check the documentation in the `/Documentation` folder
-- Review the troubleshooting section above
-
----
-
-**Built with ❤️ using Google Gemini Live API, LiveKit, and FAISS**
+**Technology Stack**: Google Gemini Live API • LiveKit • FAISS • React • FastAPI
