@@ -549,16 +549,7 @@ voice-agent/
 
 ## Technical Documentation
 
-### Comprehensive Guides
-
-| Document | Description | Target Audience |
-|----------|-------------|-----------------|
-| [SYSTEM_ARCHITECTURE_EXPLAINED.md](SYSTEM_ARCHITECTURE_EXPLAINED.md) | Complete system architecture, component breakdown, WebSocket/audio flow | Technical reviewers, architects |
-| [RAG_FLOW_EXPLAINED.md](RAG_FLOW_EXPLAINED.md) | RAG integration with Gemini Live API, vector embeddings, FAISS indexing | ML engineers, backend developers |
-| [RAG_RETRIEVAL_DOCUMENTATION.md](RAG_RETRIEVAL_DOCUMENTATION.md) | Real retrieval examples, similarity metrics, query optimization | Data scientists, QA engineers |
-| [REACT_UI_DETAILED_GUIDE.md](REACT_UI_DETAILED_GUIDE.md) | React fundamentals with Python equivalents, component architecture | Backend developers learning frontend |
-| [EMBEDDING_TESTING_GUIDE.md](EMBEDDING_TESTING_GUIDE.md) | Embedding accuracy validation, test procedures, benchmarks | ML engineers, testers |
-| [UI_SETUP_GUIDE.md](UI_SETUP_GUIDE.md) | Step-by-step UI setup, 3-terminal workflow, browser compatibility | Developers, deployers |
+For detailed information about RAG retrieval and integration with Gemini Live API, see [`RAG_RETRIEVAL_DOCUMENTATION.md`](RAG_RETRIEVAL_DOCUMENTATION.md).
 
 ---
 
@@ -571,7 +562,7 @@ MIT License - See LICENSE file for details
 ## Support
 
 - **Issues**: Open GitHub issue for bug reports or feature requests
-- **Documentation**: Refer to guides in repository root
+- **Documentation**: Refer to README and RAG documentation
 - **Security**: Report vulnerabilities privately to maintainers
 
 ---
