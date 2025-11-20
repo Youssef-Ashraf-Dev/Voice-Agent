@@ -1,0 +1,43 @@
+# Environment variables (API keys, secrets)
+.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Embeddings cache (can be regenerated)
+embeddings_cache/
+
+# Test files (optional - keep if they're useful for others)
+test_*.py
+verify.py
+demo_*.py
+
+# Documentation drafts (keep final docs, remove WIP)
+*_SUMMARY.md
+*_GUIDE.md
+*_EXPLAINED.md
+QUICK_REFERENCE.md
+RAG_README.md
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
