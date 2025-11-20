@@ -27,7 +27,6 @@ demo_*.py
 *_GUIDE.md
 *_EXPLAINED.md
 QUICK_REFERENCE.md
-RAG_README.md
 
 # IDE files
 .vscode/
