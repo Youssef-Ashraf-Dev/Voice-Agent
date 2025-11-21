@@ -14,8 +14,9 @@ venv/
 env/
 ENV/
 
-# Embeddings cache (can be regenerated)
+# Folders to ignore
 embeddings_cache/
+Planning/
 
 # Test files (optional - keep if they're useful for others)
 test_*.py
