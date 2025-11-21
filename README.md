@@ -1,6 +1,19 @@
-# Voice Agent
+# Voice Agent 🎙️
+
+A real-time, voice-first conversational AI agent using Google Gemini, LiveKit, and a local RAG module for grounded, low-latency responses.
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python"/>
+  <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React"/>
+  <img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite"/>
+  <img src="https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI"/>
+  <img src="https://img.shields.io/badge/LiveKit-FF7A00?style=for-the-badge&logo=livekit&logoColor=white" alt="LiveKit"/>
+  <img src="https://img.shields.io/badge/Google%20Gemini-8E75B2?style=for-the-badge&logo=google-gemini&logoColor=white" alt="Google Gemini"/>
+</p>
 
 This repository contains a voice-first conversational AI agent that uses Google's Gemini Live API for real-time speech-to-text, language understanding, and text-to-speech, with LiveKit handling the low-latency audio transport over WebRTC. A local RAG (Retrieval-Augmented Generation) module grounds the agent's responses in a specific knowledge base, ensuring it answers questions based on provided documentation.
+
+For a detailed explanation of the RAG implementation, see [RAG_DOCUMENTATION.md](./RAG_DOCUMENTATION.md).
 
 ## Architecture Overview
 
@@ -10,26 +23,50 @@ The system is composed of three main parts that run concurrently:
 2.  **Token Server (`token_server.py`):** A lightweight FastAPI server that issues JWTs (JSON Web Tokens) to the frontend, authorizing it to connect to a specific LiveKit room.
 3.  **Voice Agent (`agent.py`):** A Python worker that connects to the same LiveKit room. It receives the audio stream, forwards it to the Gemini Live API, and executes tools (like RAG lookups) when requested by the model.
 
-```
-Browser (React + LiveKit SDK)
-  ↕️  GET /getToken, WebRTC audio
-Token Server (FastAPI) → issues LiveKit JWT
-  ↕️  wss://<project>.livekit.cloud
-LiveKit Cloud ↔ Voice Agent (Python worker)
-  ↕️  streaming audio + function calls
-Gemini Live API
-  ↕️  lookup_company_info(query)
-RAG Module (rag.py) → data/ecommerce.json
+```mermaid
+graph TD
+    subgraph Browser
+        A[React UI]
+    end
+    subgraph Local Services
+        B[Token Server @ FastAPI]
+        C[Voice Agent @ Python]
+    end
+    subgraph Cloud Services
+        D[LiveKit Cloud]
+        E[Google Gemini Live API]
+    end
+    subgraph Data
+        F[RAG Module @ FAISS]
+        G[ecommerce.json]
+    end
+
+    A --"1. GET /getToken"--> B
+    B --"2. Returns JWT"--> A
+    A --"3. Connect w/ JWT"--> D
+    C --"4. Connect w/ API Key"--> D
+    D --"5. Bridge Audio Stream"--> C
+    C --"6. Stream Audio"--> E
+    E --"7. Request Tool Call"--> C
+    C --"8. lookup_company_info()"--> F
+    F --"9. Search"--> G
+    F --"10. Return Context"--> C
+    C --"11. Send Context"--> E
+    E --"12. Stream Audio Response"--> C
+    C --"13. Stream Audio"--> D
+    D --"14. Stream to Browser"--> A
 ```
 
-## Requirements
+## Getting Started
+
+### Prerequisites
 
 - Python 3.10+
 - Node.js 18+ and npm 9+
 - A Google AI Studio API key.
 - A LiveKit Cloud project.
 
-## Setup Instructions
+### Installation & Setup
 
 1.  **Clone the repository and install dependencies:**
     ```powershell
