@@ -68,7 +68,13 @@ graph TD
 
 ### Installation & Setup
 
-1.  **Clone the repository and install dependencies:**
+1.  **Clone the repository:**
+    ```powershell
+    git clone https://github.com/Youssef-Ashraf-Dev/Voice-Agent.git
+    cd Voice-Agent
+    ```
+
+2.  **Install dependencies:**
     ```powershell
     # Set up Python virtual environment
     python -m venv .venv
@@ -83,7 +89,7 @@ graph TD
     cd ..
     ```
 
-2.  **Configure Environment Variables:**
+3.  **Configure Environment Variables:**
     Create a file named `.env` in the root of the project directory and add your credentials. This file is ignored by Git.
 
     ```env
@@ -96,7 +102,7 @@ graph TD
     LIVEKIT_API_SECRET=...
     ```
 
-3.  **Generate RAG Embeddings:**
+4.  **Generate RAG Embeddings:**
     The first time you run the agent, it will automatically generate and cache the embeddings for the knowledge base (`data/ecommerce.json`). You can also pre-generate them with:
     ```powershell
     python -c "import rag; rag.get_stats()"
@@ -118,3 +124,8 @@ Once all three processes are running:
 2.  Click the "Start Voice Chat" button.
 3.  Allow microphone access when prompted.
 4.  Start speaking. The agent will listen and respond.
+
+
+
+## Demo Video
+[Watch the Voice Agent Demo on Google Drive](https://drive.google.com/file/d/19728Tg93G-Bum3YRpg5j6uoFyxe1Emtt/view?usp=sharing)
