@@ -17,6 +17,7 @@ ENV/
 # Folders to ignore
 embeddings_cache/
 Planning/
+Testing/
 
 # Test files (optional - keep if they're useful for others)
 test_*.py
