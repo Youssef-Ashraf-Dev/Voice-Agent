@@ -1,4 +1,4 @@
-# Voice Agent 🎙️
+# Real-Time Voice Agent with RAG (LiveKit + Gemini Live) 🎙️
 
 A real-time, voice-first conversational AI agent using Google Gemini, LiveKit, and a local RAG module for grounded, low-latency responses.
 
